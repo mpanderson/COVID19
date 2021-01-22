@@ -1,25 +1,47 @@
 library(readxl)
 library(plotly)
+library(tidyverse)
 
-code<-vector()
-for(i in 1:55){
 
-state<-read_excel("C:\\Users\\mpand\\COVID19\\2020 03 26 - By state.xlsx", sheet=i)
-code[i]<-noquote(state[[1]][1])
-nam<-paste("state.dat.",code[i],sep="")
-assign(nam,read_excel("C:\\Users\\mpand\\COVID19\\2020 03 26 - By state.xlsx", sheet=i))
+#######################################
+############  Cases ###################
+#######################################
+
+#import data and filter to get 51 state/districts and current date for covid counts
+raw.dat<- read.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_US.csv")
+abr.dat<- read.csv("https://raw.githubusercontent.com/jasonong/List-of-US-States/master/states.csv")
+
+raw.dat <-raw.dat %>% 
+  filter(iso2=="US") %>% 
+  filter(Province_State!="Diamond Princess" & Province_State!="Grand Princess") %>% 
+  select(-c(UID, iso2, iso3,code3,FIPS,Admin2,Country_Region,Lat,Long_,Combined_Key)) %>% 
+  arrange(Province_State) %>% 
+  group_by(Province_State) %>% 
+  summarise_all(sum) 
+
+abr.dat<-abr.dat[order(abr.dat[,1]),]
+full.dat<-cbind(abr.dat,raw.dat)
+
+for(i in 1:51){
+  nam<-paste("state.dat.",full.dat[i,2],sep="")
+  assign(nam,t(full.dat[i,4:dim(full.dat)[2]]))
 }
+
+
 
 #Now all 50 states are imported and saved as state.dat."States two digit code"
 
 #Get the differences
+c.d.r.NY<-apply(state.dat.NY,2,diff)
+c.d.r.CA<-apply(state.dat.CA,2,diff)
+c.d.r.OR<-apply(state.dat.OR,2,diff)
+c.d.r.OK<-apply(state.dat.OK,2,diff)
 
-
-c.d.r.NY<-apply(as.matrix(state.dat.NY[,3:5]),2,diff)
-c.d.r.CA<-apply(as.matrix(state.dat.CA[,3:5]),2,diff)
-c.d.r.OR<-apply(as.matrix(state.dat.OR[,3:5]),2,diff)
-c.d.r.OK<-apply(as.matrix(state.dat.OK[,3:5]),2,diff)
-
+#Get state populations
+pop.CA<-39512223
+pop.NY<-19453561
+pop.OR<-4217737
+pop.OK<-3956971
 
 
 today<-Sys.Date()
@@ -33,11 +55,10 @@ x2 <- today - tm2
 x3 <- today - tm3
 x4 <- today - tm4
 
-#y <- rnorm(length(x))
-y <- c.d.r.NY[,1]
-y2<-c.d.r.CA[,1]
-y3<-c.d.r.OR[,1]
-y4<-c.d.r.OK[,1]
+y <- c.d.r.NY[,1]/pop.NY*100000
+y2<-c.d.r.CA[,1]/pop.CA*100000
+y3<-c.d.r.OR[,1]/pop.OR*100000
+y4<-c.d.r.OK[,1]/pop.OK*100000
 
 s.y<-cumsum(y)
 s.y2<-cumsum(y2)
@@ -45,24 +66,88 @@ s.y3<-cumsum(y3)
 s.y4<-cumsum(y4)
 
 fig<-plot_ly(x = ~x, y = ~rev(y), type='scatter',name="New York",mode = 'lines', text = paste(rev(s.y),"total cases",rev(tm), "days after 1st infection."))%>%
-	layout(yaxis=list(title="Daily Cases",range=c(0,(max(y)+100))))%>%
-	layout(xaxis=list(title="Date"))%>%
-	add_lines(x=~x2,y=~rev(y2), name="California",mode = 'lines+markers',text = paste(rev(s.y2),"total cases",rev(tm2), "days after 1st infection."))%>%
-	add_lines(x=~x3,y=~rev(y3), name='Oregon',mode = 'lines+markers',text = paste(rev(s.y3),"total cases",rev(tm3), "days after 1st infection."))%>%
-	add_lines(x=~x4,y=~rev(y4), name='Oklahoma',mode = 'markers',text = paste(rev(s.y4),"total cases",rev(tm4), "days after 1st infection."))
+  layout(yaxis=list(title="Daily Cases per 100,000 Population",range=c(0,(max(y)+100))))%>%
+  layout(xaxis=list(title="Date"))%>%
+  add_lines(x=~x2,y=~rev(y2), name="California",mode = 'lines+markers',text = paste(rev(s.y2),"total cases",rev(tm2), "days after 1st infection."))%>%
+  add_lines(x=~x3,y=~rev(y3), name='Oregon',mode = 'lines+markers',text = paste(rev(s.y3),"total cases",rev(tm3), "days after 1st infection."))%>%
+  add_lines(x=~x4,y=~rev(y4), name='Oklahoma',mode = 'markers',text = paste(rev(s.y4),"total cases",rev(tm4), "days after 1st infection."))
 
-htmlwidgets::saveWidget(fig, "C:\\Users\\mpand\\COVID19\\index.html")
-
-
-
-fig<-fig%>% layout(
-	title= "Daily State Case Numbers",yaxis2=list(overlaying="y", tickfont=list(color="orange")))
-
-plot(x,y,type="l")
-today <- Sys.Date()
-tm <- seq(0, 600, by = 10)
-x <- today - tm
-y <- rnorm(length(x))
-fig <- plot_ly(x = ~x, y = ~y, mode = 'lines', text = paste(tm,"days from today"))
-
+htmlwidgets::saveWidget(fig, "C:\\Users\\mpand\\COVID19\\indextodate.html")
 fig
+
+
+
+
+
+######################################
+##########   Deaths   ################
+######################################
+#import data and filter to get 51 state/districts and current date for covid counts
+raw.dat<- read.csv("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_US.csv")
+abr.dat<- read.csv("https://raw.githubusercontent.com/jasonong/List-of-US-States/master/states.csv")
+
+raw.dat <-raw.dat %>% 
+  filter(iso2=="US") %>% 
+  filter(Province_State!="Diamond Princess" & Province_State!="Grand Princess") %>% 
+  select(-c(UID, iso2, iso3,code3,FIPS,Admin2,Country_Region,Lat,Long_,Combined_Key)) %>% 
+  arrange(Province_State) %>% 
+  group_by(Province_State) %>% 
+  summarise_all(sum) 
+
+abr.dat<-abr.dat[order(abr.dat[,1]),]
+full.dat<-cbind(abr.dat,raw.dat)
+
+for(i in 1:51){
+  nam<-paste("state.dat.",full.dat[i,2],sep="")
+  assign(nam,t(full.dat[i,4:dim(full.dat)[2]]))
+}
+
+
+
+#Now all 50 states are imported and saved as state.dat."States two digit code"
+
+#Get the differences
+c.d.r.NY<-apply(state.dat.NY,2,diff)
+c.d.r.CA<-apply(state.dat.CA,2,diff)
+c.d.r.OR<-apply(state.dat.OR,2,diff)
+c.d.r.OK<-apply(state.dat.OK,2,diff)
+
+#Get state populations
+pop.CA<-39512223
+pop.NY<-19453561
+pop.OR<-4217737
+pop.OK<-3956971
+
+
+today<-Sys.Date()
+tm <- seq(1, dim(state.dat.NY)[1]-1, by = 1)
+tm2 <- seq(1, dim(state.dat.CA)[1]-1, by = 1)
+tm3 <- seq(1, dim(state.dat.OR)[1]-1, by = 1)
+tm4 <- seq(1, dim(state.dat.OK)[1]-1, by = 1)
+
+x <- today - tm
+x2 <- today - tm2
+x3 <- today - tm3
+x4 <- today - tm4
+
+y <- c.d.r.NY[,1]/pop.NY*100000
+y2<-c.d.r.CA[,1]/pop.CA*100000
+y3<-c.d.r.OR[,1]/pop.OR*100000
+y4<-c.d.r.OK[,1]/pop.OK*100000
+
+s.y<-cumsum(y)
+s.y2<-cumsum(y2)
+s.y3<-cumsum(y3)
+s.y4<-cumsum(y4)
+
+fig<-plot_ly(x = ~x, y = ~rev(y), type='scatter',name="New York",mode = 'lines')%>%
+  layout(yaxis=list(title="Daily Deaths Per 100,000 Population",range=c(0,7)))%>%
+  layout(xaxis=list(title="Date"))%>%
+  add_lines(x=~x2,y=~rev(y2), name="California",mode = 'lines+markers')%>%
+  add_lines(x=~x3,y=~rev(y3), name='Oregon',mode = 'lines+markers')%>%
+  add_lines(x=~x4,y=~rev(y4), name='Oklahoma',mode = 'markers',)
+
+htmlwidgets::saveWidget(fig, "C:\\Users\\mpand\\COVID19\\indexdeathtodate.html")
+fig
+
+
